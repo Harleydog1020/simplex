@@ -11,25 +11,28 @@ from pandas import DataFrame
 class SimplexData:
     def __init__(self, input_df):
         self.var_labels = np.array(list(input_df.columns))
+        self.con_ar = np.array(input_df.iloc[0:, :1])
         temp1a = np.array(input_df.iloc[1:, 1:])
         temp1b = np.array(input_df.iloc[0:1, 1:])
         temp1 = np.concatenate((temp1a, temp1b), axis=0)
-        if np.array(input_df.iloc[0:1, 0:1]) == [['Max']]:
+
+        self.p_type = [[x.upper() for x in y] for y in np.array(input_df.iloc[0:1, 0:1])]
+        if self.p_type == [['MIN']]:
             temp2 = temp1.T
         else:
             temp2 = temp1
 
-        self.n_rows = len(input_df.index)
-        self.n_cols = input_df.shape[1]
-        self.rhs_ar = np.array(input_df.iloc[1:, self.n_cols - 1:])
+        self.n_rows, self.n_cols = temp2.shape
+        self.rhs_ar = np.array(temp2[0:, self.n_cols - 1:])
 
-        self.obj_ar = np.array(input_df.iloc[:1, 1:self.n_cols - 1]) * - 1
-        self.eqn_ar = np.array(input_df.iloc[1:, 1:self.n_cols - 1])
-        self.con_ar = np.array(input_df.iloc[0:, :1])
-        a2 = np.identity(self.n_rows)
-        self.eqn_ar = np.concatenate((self.eqn_ar, self.obj_ar), axis=0)
+        self.obj_ar = np.array(temp2[self.n_rows-1:self.n_rows, 0:self.n_cols - 1]) * - 1
+        a1 = np.identity(self.n_rows - 1)
+        a3 =[[0 for element in range(self.n_rows - 1)]]
+        a2 = np.concatenate((a1, a3), axis=0)
+        self.eqn_ar = np.concatenate((np.array(temp2[0:self.n_rows-1, 0:self.n_cols-1]),
+                                               np.array(self.obj_ar)),
+                                     axis=0)
         self.table = np.concatenate((self.eqn_ar, a2), axis=1)
-        self.rhs_ar = np.concatenate((self.rhs_ar, [[0]]), axis=0)
 
 
 def read_problem(in_file: str):
@@ -65,7 +68,6 @@ def solver(solve_ar: SimplexData):
             if np.isnan(i_min) or new_rhs[i_row:i_row + 1] / new_equations[i_row:i_row + 1, i_col: i_col + 1] < i_min:
                 i_min = new_rhs[i_row:i_row + 1] / new_equations[i_row:i_row + 1, i_col: i_col + 1]
                 pvt_row = i_row
-        print('pvt_row: ', pvt_row)
 
         a2 = np.identity(n_rows)
 
@@ -80,14 +82,18 @@ def solver(solve_ar: SimplexData):
         new_equations = np.dot(a2, new_equations)
         new_rhs = np.dot(a2, new_rhs)
         num_neg = np.count_nonzero(new_equations[n_rows - 1:n_rows, 0:] < 0)
-        print("num_neg: ", num_neg)
 
+    if solve_ar.p_type == [['MIN']]:
+        temp1 = np.concatenate((new_equations, new_rhs), axis=1)
+        temp2 = temp1.T
+        new_equations = temp2[0:, 0:solve_ar.n_rows-1]
+        new_rhs = temp2[0:, solve_ar.n_rows-1:solve_ar.n_rows]
     return new_equations, new_rhs
 
 
 # #########################  MAIN  #########################################
 if __name__ == '__main__':
-    problem_data = read_problem('~/simplex/data/sample2.csv')
+    problem_data = read_problem('~/simplex/data/sample5.csv')
     solution_equations, solution_rhs = solver(problem_data)
 
     print("----------------- Problem ----------------------")
@@ -96,5 +102,5 @@ if __name__ == '__main__':
     print(problem_data.rhs_ar)
 
     print("----------------- Solution ---------------------")
-    print(solution_equations)
-    print(solution_rhs)
+    print(np.round(solution_equations,2))
+    print(np.round(solution_rhs,2))
