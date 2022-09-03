@@ -1,0 +1,5 @@
+﻿Condition,x,y,rho
+Max,5,4,
+LE,3,5,78
+LE,4,1,36
+
